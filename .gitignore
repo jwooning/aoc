@@ -1,3 +1,5 @@
+venv/
+.idea/
 *.swp
 
 Created by https://www.toptal.com/developers/gitignore/api/rust
