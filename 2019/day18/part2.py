@@ -1,106 +1,147 @@
-from collections import OrderedDict
+#!/usr/bin/env python
 
+import copy
+import numpy as np
+from collections import OrderedDict
+from collections import defaultdict
+
+class Graph:
+  def __init__(self):
+    self.nodes = {}
+
+  def __getitem__(self, id_):
+    if id_ not in self.nodes:
+      self.nodes[id_] = Node(id_)
+
+    return self.nodes[id_]
+
+  def parse(self, m):
+    todo = []
+
+    for y, l in enumerate(m):
+      for x, ch in enumerate(l):
+        if ch == b'@' or ch.islower():
+          todo.append((y, x, ch, 0, set(), set([(y, x)])))  # y, x, id_, length, doors, visited
+
+    while len(todo):
+      y, x, id_, l, drs, vstd = todo.pop(0)
+      for dy, dx in [(0, -1), (1, 0), (0, 1), (-1, 0)]:
+        ny = y + dy
+        nx = x + dx
+        if (ny, nx) in vstd:
+          continue
+        if m[ny, nx] == b'#':
+          continue
+        elif m[ny, nx] == b'@' or m[ny, nx].islower():
+          self[id_].add_edge(self[m[ny, nx]], Edge(l + 1, drs))
+          continue
+
+        ndrs = drs.copy()
+        nvstd = vstd.copy()
+
+        nvstd.add((ny, nx))
+        if m[ny][nx].isupper():
+          ndrs.add(m[ny, nx].lower())
+
+        todo.append((ny, nx, id_, l + 1, ndrs, nvstd))
+
+class Node:
+  def __init__(self, id_):
+    self.id_ = id_
+    self.edges = defaultdict(lambda: [])
+
+  def add_edge(self, n, e):
+    if e not in self.edges[n.id_]:
+      self.edges[n.id_].append(e)
+      self.edges[n.id_] = sorted(self.edges[n.id_], key=lambda x: x.w)
+
+      n.edges[self.id_].append(e)
+      n.edges[self.id_] = sorted(n.edges[self.id_], key=lambda x: x.w)
+
+  def __str__(self):
+    return f'N({self.id_})'
+
+class Edge:
+  def __init__(self, w, doors):
+    self.w = w
+    self.doors = frozenset(doors)
+
+  def __eq__(self, o):
+    return self.w == o.w and self.doors == o.doors
+
+  def __str__(self):
+    return f'E({self.w}, {self.doors})'
 
 def solve_input(file):
-    with open(file, 'r') as f:
-        file_content = f.read().strip()
-        solve(file_content)
+  with open(file, 'r') as f:
+    file_content = f.read().strip()
+    solve(file_content)
 
-
-def steps_req(MAP, y_1, x_1, y_2, x_2, keys=None):
-    paths = [{'y_1': y_1, 'x_1': x_1, 'visited': [(y_1, x_1)], 'steps': 0}]
-    accessible = ['.', '@']
-    if keys is not None:
-        for key in keys:
-            accessible += [key, key.upper()]
-
-    # Because searching uses BFS, visited can be global (first instance will always be shortest distance)
-    visited = []
-    while True:
-        if len(paths) == 0:
-            return None
-
-        path = paths.pop(0)
-        if path['y_1'] == y_2 and path['x_1'] == x_2:
-            return path['steps']
-
-        new_yx = [(path['y_1'], path['x_1'] + 1), (path['y_1'], path['x_1'] - 1),
-                  (path['y_1'] + 1, path['x_1']), (path['y_1'] - 1, path['x_1'])]
-        for new_y, new_x in new_yx:
-            if new_y == y_2 and new_x == x_2:
-                return path['steps'] + 1
-            if MAP[new_y][new_x] in accessible and (new_y, new_x) not in visited:
-                visited.append((new_y, new_x))
-                paths.append({
-                    'y_1': new_y,
-                    'x_1': new_x,
-                    'steps': path['steps'] + 1,
-                })
-
-
-def find(MAP, needle):
-    for i, line in enumerate(MAP):
-        if needle in line:
-            return i, line.index(needle)
-
-
-def find_keys_it(MAP, all_keys, Y, X):
-    dist_hist = {}  # (frozenset((y_1, x_1), (y_2, x_2)), frozenset(keys)): dist
-
-    key_paths = OrderedDict({(Y, X, frozenset()): 0})
-    key_paths_hist = key_paths.copy()
-    results = []
-    i = 0
-    while True:
-        i += 1
-        if len(key_paths) == 0:
-            break
-
-        print(len(key_paths), next(iter(key_paths.items())))
-
-        kp_key, kp_steps = key_paths.popitem(last=False)
-        if all_keys == kp_key[2]:
-            results.append((kp_steps, kp_key[2]))
-            continue
-
-        access_keys = {}
-        for key in (all_keys - kp_key[2]):
-            key_y, key_x = find(MAP, key)
-            dist_hist_key = (frozenset({(kp_key[0], kp_key[1]), (key_y, key_x)}), kp_key[2])
-            if dist_hist_key in dist_hist and dist_hist[dist_hist_key] is not None:
-                access_keys[key] = dist_hist[dist_hist_key]
-            else:
-                key_dist = steps_req(MAP, kp_key[0], kp_key[1], key_y, key_x, kp_key[2])
-                dist_hist[dist_hist_key] = key_dist
-                if key_dist is not None:
-                    access_keys[key] = key_dist
-
-        for key, dist in access_keys.items():
-            new_kp_steps = kp_steps + dist
-            new_pos = find(MAP, key)
-            new_kp_key = (new_pos[0], new_pos[1], kp_key[2] | {key})
-
-            if new_kp_key in key_paths_hist and key_paths_hist[new_kp_key] <= new_kp_steps:
-                continue
-
-            key_paths[new_kp_key] = new_kp_steps
-            key_paths_hist[new_kp_key] = new_kp_steps
-
-    return results
-
+def find(m, needle):
+  res = np.where(m == needle)
+  return res[0][0], res[1][0]
 
 def solve(inp):
-    all_keys = frozenset()
-    MAP = []
-    for line in inp.split('\n'):
-        MAP.append([char for char in line])
-        all_keys |= frozenset([char for char in line if char.islower() and char.isalpha()])
+  all_keys = frozenset()
+  MAP = []
+  for line in inp.split('\n'):
+    MAP.append([char for char in line])
+    all_keys |= frozenset([char for char in line if char.islower() and char.isalpha()])
 
-    Y, X = find(MAP, '@')
+  m = np.chararray((len(MAP), len(MAP[0])))
+  m[:] = MAP
 
-    print(min([d for d, _ in find_keys_it(MAP, all_keys, Y, X)]))
+  Y, X = find(m, b'@')
 
+  m[Y-1, X-1: X+2] = [b'@', b'#', b'@']
+  m[Y+0, X-1: X+2] = [b'#', b'#', b'#']
+  m[Y+1, X-1: X+2] = [b'@', b'#', b'@']
+
+  ms = []
+  ms.append(m[:Y+1, :X+1])
+  ms.append(m[:Y+1, X:])
+  ms.append(m[Y:, :X+1])
+  ms.append(m[Y:, X:])
+
+  graphs = []
+  for m in ms:
+    g = Graph()
+    g.parse(m)
+    graphs.append(g)
+
+
+  history = {}
+  todo = [((b'@', b'@', b'@', b'@'), 0, frozenset())]
+  res = None
+  while len(todo):
+    ats, steps, keys = todo.pop(0)
+
+    if len(keys) == len(all_keys):
+      res = steps if res is None else min(res, steps)
+      continue
+
+    for i in range(4):
+      at = ats[i]
+      g = graphs[i]
+
+      for nat, es in g[at].edges.items():
+        for e in es:
+          if e.doors.issubset(keys):
+            nats = list(ats)
+            nats[i] = nat
+            nats = tuple(nats)
+            if nat == b'@':
+              nkeys = keys.copy()
+            else:
+              nkeys = keys | frozenset([nat])
+
+            print(len(nkeys), len(all_keys), nats, steps + e.w, sorted(list(nkeys)))
+            if (nats, nkeys) not in history or history[(nats, nkeys)] > steps + e.w:
+              history[(nats, nkeys)] = steps + e.w
+              todo.append((nats, steps + e.w, nkeys))
+
+  print(f'p2: {res}')
 
 if __name__ == '__main__':
-    # solve_input('input_t1')
-    solve_input('input')
+  # solve_input('input_t1')
+  solve_input('input')
