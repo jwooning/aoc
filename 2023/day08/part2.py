@@ -1,8 +1,17 @@
 #!/usr/bin/env python
 
+import math
 import itertools
 import collections
 import functools
+
+def lcm(*args):
+  res = args[0]
+  for i in range(1, len(args)):
+    gdc = math.gcd(res, args[i])
+    res = (res * args[i]) // gdc
+
+  return res
 
 def solve_input():
   with open('input', 'r') as f:
@@ -38,14 +47,15 @@ def solve(inp):
   # TODO somehow iterate indivually and find combined pattern in l0 and locations
   for i in range(n):
     steps = 0
-    while len(solv[i]) < n:
+    while True:
       dirn = steps % len(l0)
       key = (dirn, fs[i])
-      if fs[i].endswith('Z'):
-        solv[i][key] = steps
 
       if key in solv[i]:  # circular
         break
+
+      if fs[i].endswith('Z'):
+        solv[i][key] = steps
 
       idx = idxs[l0[dirn]]
       fs[i] = routes[fs[i]][idx]
@@ -53,6 +63,9 @@ def solve(inp):
       steps += 1
 
     print('fin')
+
+  print(solv)
+  p2 = lcm(*[next(iter(it.values())) for it in solv])
   print(f'p2: {p2}')
 
 if __name__ == '__main__':
